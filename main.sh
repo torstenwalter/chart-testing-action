@@ -21,6 +21,10 @@ main() {
         args+=(--kubeconfig "${INPUT_KUBECONFIG}")
     fi
 
+    if [[ -n "${INPUT_INITCOMMANDS:-}" ]]; then
+        args+=(--init-commands "${INPUT_INITCOMMANDS}")
+    fi
+
     "$SCRIPT_DIR/ct.sh" "${args[@]}"
 }
 

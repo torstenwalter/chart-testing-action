@@ -15,6 +15,7 @@ Usage: $(basename "$0") <options>
     -c, --command       The chart-testing command to run
         --config        The path to the chart-testing config file
         --kubeconfig    The path to the kube config file
+        --init-commands Commands which should be run in the container before starting tests
 EOF
 }
 
@@ -23,6 +24,7 @@ main() {
     local config=
     local command=
     local kubeconfig="$HOME/.kube/config"
+    local initCommands=()
 
     parse_command_line "$@"
 
@@ -46,6 +48,16 @@ main() {
     # Convenience output for other actions to make use of ct config to check if
     # charts changed.
     echo "::set-output name=changed::true"
+
+    if [[ "${#initCommands[@]}" -ne 0 ]]; then
+        echo 'executing init commands'
+        for i in "${initCommands[@]}"
+        do
+          IFS=" " read -r -a i <<< "$i"
+          docker_exec "${i[@]}"
+        done
+        return
+    fi
 
     # All other ct commands require a cluster to be created in a previous step.
     if [[ "$command" != "lint" ]] && [[ "$command" != "list-changed" ]]; then
@@ -102,6 +114,27 @@ parse_command_line() {
                     exit 1
                 fi
                 ;;
+            --docker-args)
+                if [[ -n "${2:-}" ]]; then
+                    #dockerArgs="$2"
+                    IFS=" " read -r -a dockerArgs <<< "$dockerArgs"
+                    shift
+                else
+                    echo "ERROR: '--docker-args' cannot be empty." >&2
+                    show_help
+                    exit 1
+                fi
+                ;;
+            --init-commands)
+                if [[ -n "${2:-}" ]]; then
+                    initCommands+=( "$2" )
+                    shift
+                else
+                    echo "ERROR: '--init-commands' cannot be empty." >&2
+                    show_help
+                    exit 1
+                fi
+                ;;
             *)
                 break
                 ;;
@@ -145,6 +178,7 @@ cleanup() {
 }
 
 docker_exec() {
+    echo docker exec --interactive ct "$@"
     docker exec --interactive ct "$@"
 }
 
